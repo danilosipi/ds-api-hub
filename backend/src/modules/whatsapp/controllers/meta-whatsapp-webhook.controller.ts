@@ -1,4 +1,12 @@
-import { Controller, Get, Logger, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 
 @Controller('webhooks/whatsapp/meta')
@@ -42,5 +50,11 @@ export class MetaWhatsappWebhookController {
 
     this.logger.log('Verificação Meta webhook concluída com sucesso.');
     res.status(200).type('text/plain').send(challenge);
+  }
+
+  @Post()
+  receive(@Body() body: any, @Res() res: Response): void {
+    this.logger.log(`META WEBHOOK POST: ${JSON.stringify(body)}`);
+    res.status(200).json({ received: true });
   }
 }
