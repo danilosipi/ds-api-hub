@@ -54,7 +54,30 @@ export class MetaWhatsappWebhookController {
 
   @Post()
   receive(@Body() body: any, @Res() res: Response): void {
-    this.logger.log(`META WEBHOOK POST: ${JSON.stringify(body)}`);
+    const value = body?.entry?.[0]?.changes?.[0]?.value;
+    const contact = value?.contacts?.[0];
+    const message = value?.messages?.[0];
+
+    if (!value || !message) {
+      this.logger.warn('META WEBHOOK POST recebido sem mensagem útil.');
+      res.status(200).json({ received: true });
+      return;
+    }
+
+    const summary = {
+      messagingProduct: value?.messaging_product ?? null,
+      displayPhoneNumber: value?.metadata?.display_phone_number ?? null,
+      phoneNumberId: value?.metadata?.phone_number_id ?? null,
+      customerWaId: contact?.wa_id ?? null,
+      customerName: contact?.profile?.name ?? null,
+      messageId: message?.id ?? null,
+      from: message?.from ?? null,
+      timestamp: message?.timestamp ?? null,
+      type: message?.type ?? null,
+      textBody: message?.text?.body ?? null,
+    };
+
+    this.logger.log(`META WEBHOOK MESSAGE: ${JSON.stringify(summary)}`);
     res.status(200).json({ received: true });
   }
 }
