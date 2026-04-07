@@ -16,10 +16,20 @@ export class WhatsappOutboundClientService {
     }
 
     const url = `${base.replace(/\/$/, '')}/whatsapp/webhook`;
+    const accountId = process.env.PROCESSOR_ACCOUNT_ID ?? 'dev-account';
 
     try {
       await firstValueFrom(
-        this.httpService.post(url, { source: 'meta', ...payload }),
+        this.httpService.post(
+          url,
+          { source: 'meta', ...payload },
+          {
+            headers: {
+              'x-account-id': accountId,
+              'Content-Type': 'application/json',
+            },
+          },
+        ),
       );
       this.logger.log('EVENTO ENVIADO PARA PROCESSADOR');
     } catch {
