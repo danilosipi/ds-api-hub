@@ -24,6 +24,12 @@ export class MetaOauthCallbackController {
       error_reason,
       error_description,
     });
+
+    if (result.kind === 'redirect') {
+      res.redirect(result.status, result.location);
+      return;
+    }
+
     res.status(result.status).json(result.body);
   }
 }
