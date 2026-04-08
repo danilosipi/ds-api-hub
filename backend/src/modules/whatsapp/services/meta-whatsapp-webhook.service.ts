@@ -1,36 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { WhatsappIntegrationRepository } from '../repositories/whatsapp-integration.repository';
+import type { MetaIncomingParsed } from '../types/meta-whatsapp-incoming.types';
 import { WhatsappOutboundClientService } from './whatsapp-outbound-client.service';
-
-type MetaIncomingMessageData = {
-  messagingProduct: string | null;
-  displayPhoneNumber: string | null;
-  phoneNumberId: string | null;
-  customerWaId: string | null;
-  customerName: string | null;
-  messageId: string | null;
-  from: string | null;
-  timestamp: string | null;
-  type: string | null;
-  textBody: string | null;
-};
-
-type MetaIncomingStatusData = {
-  messageId: string | null;
-  status: string | null;
-  timestamp: string | null;
-  recipientId: string | null;
-};
-
-type MetaIncomingUnknownData = {
-  rawObject: string | null;
-  hasEntry: boolean;
-  changeField: string | null;
-};
-
-type MetaIncomingParsed =
-  | { kind: 'message'; data: MetaIncomingMessageData }
-  | { kind: 'status'; data: MetaIncomingStatusData }
-  | { kind: 'unknown'; data: MetaIncomingUnknownData };
 
 @Injectable()
 export class MetaWhatsappWebhookService {
@@ -38,6 +9,7 @@ export class MetaWhatsappWebhookService {
 
   constructor(
     private readonly whatsappOutboundClient: WhatsappOutboundClientService,
+    private readonly whatsappIntegrationRepository: WhatsappIntegrationRepository,
   ) {}
 
   private parseIncoming(body: any): MetaIncomingParsed {
@@ -73,6 +45,8 @@ export class MetaWhatsappWebhookService {
       return {
         kind: 'status',
         data: {
+          phoneNumberId: value?.metadata?.phone_number_id ?? null,
+          displayPhoneNumber: value?.metadata?.display_phone_number ?? null,
           messageId: s?.id ?? null,
           status: s?.status ?? null,
           timestamp: s?.timestamp ?? null,
@@ -94,10 +68,6 @@ export class MetaWhatsappWebhookService {
   processIncoming(body: any): void {
     const parsed = this.parseIncoming(body);
 
-    if (parsed.kind === 'message' || parsed.kind === 'status') {
-      void this.whatsappOutboundClient.sendEvent(parsed);
-    }
-
     if (parsed.kind === 'message') {
       const value = body?.entry?.[0]?.changes?.[0]?.value;
       const message = value?.messages?.[0];
@@ -115,5 +85,34 @@ export class MetaWhatsappWebhookService {
         `META WEBHOOK EVENTO NÃO MAPEADO: ${JSON.stringify(parsed.data)}`,
       );
     }
+
+    if (parsed.kind !== 'message' && parsed.kind !== 'status') {
+      return;
+    }
+
+    let accountId = this.whatsappIntegrationRepository.resolveAccountId(
+      parsed.data.phoneNumberId,
+      parsed.data.displayPhoneNumber,
+    );
+
+    if (!accountId && process.env.PROCESSOR_ACCOUNT_ID?.trim()) {
+      this.logger.warn(
+        'account_id via PROCESSOR_ACCOUNT_ID (legado). Para multi-tenant, use WHATSAPP_INTEGRATIONS_JSON.',
+      );
+      accountId = process.env.PROCESSOR_ACCOUNT_ID.trim();
+    }
+
+    if (!accountId) {
+      this.logger.warn(
+        `Evento WhatsApp não encaminhado: integração não encontrada para phone_number_id=${parsed.data.phoneNumberId ?? '(nulo)'} display=${parsed.data.displayPhoneNumber ?? '(nulo)'}`,
+      );
+      return;
+    }
+
+    void this.whatsappOutboundClient.sendEvent({
+      kind: parsed.kind,
+      account_id: accountId,
+      data: parsed.data,
+    });
   }
 }
