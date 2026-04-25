@@ -12,13 +12,18 @@ export type WhatsappProcessorPayload = {
   data: MetaIncomingMessageData | MetaIncomingStatusData;
 };
 
+export type WhatsappProvider = 'meta' | 'evolution';
+
 @Injectable()
 export class WhatsappOutboundClientService {
   private readonly logger = new Logger(WhatsappOutboundClientService.name);
 
   constructor(private readonly httpService: HttpService) {}
 
-  async sendEvent(payload: WhatsappProcessorPayload): Promise<void> {
+  async sendEvent(
+    payload: WhatsappProcessorPayload,
+    provider: WhatsappProvider = 'meta',
+  ): Promise<void> {
     const base = process.env.PROCESSOR_API_URL;
     if (!base?.trim()) {
       this.logger.error('ERRO AO ENVIAR EVENTO PARA PROCESSADOR');
@@ -31,7 +36,7 @@ export class WhatsappOutboundClientService {
         event: 'whatsapp.event.forwarding',
         account_id: payload.account_id,
         phoneNumberId,
-        provider: 'meta',
+        provider,
       }),
     );
 

@@ -1,6 +1,6 @@
 # DS API Hub
 
-Hub HTTP em [NestJS](https://nestjs.com/) que expõe o webhook da **WhatsApp Cloud API (Meta)** e repassa eventos normalizados para um backend principal (por exemplo “Minha Agenda”), que os processa em `POST /whatsapp/webhook`.
+Hub HTTP em [NestJS](https://nestjs.com/) que expõe webhooks do **WhatsApp Cloud API (Meta)** e **Evolution API**, e repassa eventos normalizados para um backend principal (por exemplo “Minha Agenda”), que os processa em `POST /whatsapp/webhook`.
 
 ## Estrutura do repositório
 
@@ -12,7 +12,7 @@ Hub HTTP em [NestJS](https://nestjs.com/) que expõe o webhook da **WhatsApp Clo
 ## O que este serviço faz
 
 1. **Verificação do webhook (Meta)** — responde ao challenge do Facebook com `GET` quando o token confere.
-2. **Recepção de eventos** — aceita `POST` com o payload bruto da Meta.
+2. **Recepção de eventos** — aceita `POST` com o payload bruto da Meta e da Evolution.
 3. **Normalização e encaminhamento** — interpreta mensagens e status conhecidos e envia para o processador:
 
    - URL: `{PROCESSOR_API_URL}/whatsapp/webhook`
@@ -58,10 +58,15 @@ A API sobe em `http://localhost:3001` (ou na porta definida em `PORT`), com CORS
 | `GET` | `/health` | Health check (`{ "status": "ok" }`). |
 | `GET` | `/webhooks/whatsapp/meta` | Verificação do webhook Meta (`hub.mode`, `hub.verify_token`, `hub.challenge`). |
 | `POST` | `/webhooks/whatsapp/meta` | Recebimento dos eventos da Meta; responde `200` com `{ "received": true }`. |
+| `POST` | `/webhooks/whatsapp/evolution` | Recebimento dos eventos da Evolution; responde `200` com `{ "received": true }`. |
 
 Na Meta, a **URL de callback** deve apontar para:
 
 `https://<seu-dominio>/webhooks/whatsapp/meta`
+
+Na Evolution, configure o webhook para:
+
+`https://<seu-dominio>/webhooks/whatsapp/evolution`
 
 (usando HTTPS em produção).
 
