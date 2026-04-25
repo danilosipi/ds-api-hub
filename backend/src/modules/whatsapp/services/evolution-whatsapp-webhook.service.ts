@@ -16,7 +16,13 @@ export class EvolutionWhatsappWebhookService {
     const data = body?.data ?? {};
     const key = data?.key ?? {};
     const message = data?.message ?? {};
-    const instance = body?.instance ?? {};
+    const instanceRaw = body?.instance;
+    const instance =
+      typeof instanceRaw === 'string'
+        ? instanceRaw
+        : typeof instanceRaw?.instanceName === 'string'
+          ? instanceRaw.instanceName
+          : null;
     const fromMe = key?.fromMe === true;
 
     const remoteJid =
@@ -25,10 +31,10 @@ export class EvolutionWhatsappWebhookService {
       typeof key?.participant === 'string' ? key.participant.trim() : '';
     const senderPhone = this.extractDigitsFromJid(participant || remoteJid);
     const displayPhoneNumber = this.extractDigits(
-      instance?.integration ?? instance?.instanceName ?? null,
+      body?.instance?.integration ?? body?.instance?.instanceName ?? null,
     );
     const phoneNumberId = this.extractDigits(
-      instance?.instanceId ?? instance?.instanceName ?? null,
+      body?.instance?.instanceId ?? body?.instance?.instanceName ?? null,
     );
 
     const messageId = key?.id ?? body?.event_id ?? null;
@@ -55,6 +61,7 @@ export class EvolutionWhatsappWebhookService {
           messagingProduct: 'whatsapp',
           displayPhoneNumber,
           phoneNumberId,
+          rawInstance: instance,
           customerWaId: senderPhone,
           customerName: data?.pushName ?? null,
           messageId,
@@ -73,6 +80,7 @@ export class EvolutionWhatsappWebhookService {
         data: {
           phoneNumberId,
           displayPhoneNumber,
+          rawInstance: instance,
           messageId,
           status: statusName,
           timestamp,
@@ -117,21 +125,42 @@ export class EvolutionWhatsappWebhookService {
       return;
     }
 
-    let accountId = this.whatsappIntegrationRepository.resolveAccountId(
-      parsed.data.phoneNumberId,
-      parsed.data.displayPhoneNumber,
-    );
+    const instance =
+      typeof parsed.data.rawInstance === 'string'
+        ? parsed.data.rawInstance.trim()
+        : '';
+    let accountId =
+      this.whatsappIntegrationRepository.resolveEvolutionAccountId(instance);
+
+    if (accountId) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'whatsapp.evolution.account.resolved',
+          resolver: 'instance',
+          instance: instance || null,
+          account_id: accountId,
+        }),
+      );
+    }
 
     if (!accountId && process.env.PROCESSOR_ACCOUNT_ID?.trim()) {
       this.logger.warn(
         'account_id via PROCESSOR_ACCOUNT_ID (legado). Para multi-tenant, use WHATSAPP_INTEGRATIONS_JSON.',
       );
       accountId = process.env.PROCESSOR_ACCOUNT_ID.trim();
+      this.logger.log(
+        JSON.stringify({
+          event: 'whatsapp.evolution.account.resolved',
+          resolver: 'processor_account_id',
+          instance: instance || null,
+          account_id: accountId,
+        }),
+      );
     }
 
     if (!accountId) {
       this.logger.warn(
-        `Evento WhatsApp Evolution não encaminhado: integração não encontrada para phone_number_id=${parsed.data.phoneNumberId ?? '(nulo)'} display=${parsed.data.displayPhoneNumber ?? '(nulo)'}`,
+        `Evento WhatsApp Evolution não encaminhado: integração não encontrada para instance=${instance || '(nulo)'}`,
       );
       return;
     }

@@ -9,6 +9,7 @@ export type MetaIncomingMessageData = {
   timestamp: string | null;
   type: string | null;
   textBody: string | null;
+  rawInstance?: string | null;
 };
 
 export type MetaIncomingStatusData = {
@@ -18,6 +19,7 @@ export type MetaIncomingStatusData = {
   status: string | null;
   timestamp: string | null;
   recipientId: string | null;
+  rawInstance?: string | null;
 };
 
 export type MetaIncomingUnknownData = {

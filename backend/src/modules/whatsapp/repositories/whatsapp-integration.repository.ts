@@ -4,9 +4,11 @@ import { dirname } from 'path';
 
 /** Registro vindo de WHATSAPP_INTEGRATIONS_JSON (snake_case no contrato de configuração). */
 export type IntegrationConfigRow = {
-  phone_number_id: string;
+  provider?: string;
+  phone_number_id?: string;
   account_id: string;
   display_phone_number?: string;
+  instance?: string;
 };
 
 @Injectable()
@@ -16,6 +18,7 @@ export class WhatsappIntegrationRepository implements OnModuleInit {
   private dynamicRows: IntegrationConfigRow[] = [];
   private byPhoneNumberId = new Map<string, string>();
   private byDisplayNormalized = new Map<string, string>();
+  private byEvolutionInstance = new Map<string, string>();
 
   async onModuleInit(): Promise<void> {
     this.loadEnvRows();
@@ -43,10 +46,9 @@ export class WhatsappIntegrationRepository implements OnModuleInit {
       }
       this.envRows = rows.filter(
         (r) =>
-          typeof r?.phone_number_id === 'string' &&
-          r.phone_number_id.trim().length > 0 &&
           typeof r?.account_id === 'string' &&
-          r.account_id.trim().length > 0,
+          r.account_id.trim().length > 0 &&
+          this.isValidRow(r),
       );
       this.logger.log(
         `Integrações WhatsApp (env): ${this.envRows.length} entradas.`,
@@ -85,10 +87,9 @@ export class WhatsappIntegrationRepository implements OnModuleInit {
       }
       this.dynamicRows = rows.filter(
         (r) =>
-          typeof r?.phone_number_id === 'string' &&
-          r.phone_number_id.trim().length > 0 &&
           typeof r?.account_id === 'string' &&
-          r.account_id.trim().length > 0,
+          r.account_id.trim().length > 0 &&
+          this.isValidRow(r),
       );
       this.logger.log(
         `Integrações WhatsApp (dinâmico): ${this.dynamicRows.length} entradas em ${path}.`,
@@ -109,11 +110,22 @@ export class WhatsappIntegrationRepository implements OnModuleInit {
   private rebuildMaps(): void {
     this.byPhoneNumberId.clear();
     this.byDisplayNormalized.clear();
+    this.byEvolutionInstance.clear();
     const rows = [...this.envRows, ...this.dynamicRows];
     for (const row of rows) {
-      const pid = row.phone_number_id.trim();
       const aid = row.account_id.trim();
-      this.byPhoneNumberId.set(pid, aid);
+      if (this.isEvolutionProvider(row.provider)) {
+        const instance = row.instance?.trim().toLowerCase();
+        if (instance) {
+          this.byEvolutionInstance.set(instance, aid);
+        }
+        continue;
+      }
+
+      const pid = row.phone_number_id?.trim();
+      if (pid) {
+        this.byPhoneNumberId.set(pid, aid);
+      }
       const disp = row.display_phone_number?.trim();
       if (disp) {
         this.byDisplayNormalized.set(this.normalizePhone(disp), aid);
@@ -185,6 +197,29 @@ export class WhatsappIntegrationRepository implements OnModuleInit {
       }
     }
     return null;
+  }
+
+  resolveEvolutionAccountId(instance: string | null): string | null {
+    if (!instance?.trim()) {
+      return null;
+    }
+    return this.byEvolutionInstance.get(instance.trim().toLowerCase()) ?? null;
+  }
+
+  private isEvolutionProvider(provider: string | undefined): boolean {
+    return provider?.trim().toLowerCase() === 'evolution';
+  }
+
+  private isValidRow(row: IntegrationConfigRow): boolean {
+    if (this.isEvolutionProvider(row.provider)) {
+      return (
+        typeof row.instance === 'string' && row.instance.trim().length > 0
+      );
+    }
+    return (
+      typeof row.phone_number_id === 'string' &&
+      row.phone_number_id.trim().length > 0
+    );
   }
 
   private normalizePhone(value: string): string {
